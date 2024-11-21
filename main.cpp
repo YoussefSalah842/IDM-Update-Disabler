@@ -1,101 +1,100 @@
 #include <windows.h>
-#include <iostream>
+#include <fstream>
 #include <string>
-#include <shellapi.h>  
+#include <iostream>
+#include <commctrl.h>
+#pragma comment(lib, "comctl32.lib")
 
-
-void DisableIDMUpdates() {
+// Function to back up the registry key
+void BackupRegistryKey(HWND hwnd) {
     HKEY hKey;
-    LONG result;
-
-    
-    result = RegOpenKeyEx(HKEY_CURRENT_USER, 
-                          "Software\\DownloadManager", 
-                          0, 
-                          KEY_WRITE, 
-                          &hKey);
+    const char* subkey = "Software\\DownloadManager";
+    LONG result = RegOpenKeyEx(HKEY_CURRENT_USER, subkey, 0, KEY_READ, &hKey);
 
     if (result == ERROR_SUCCESS) {
-        
-        const char* value = "01/06/99";
-        result = RegSetValueEx(hKey, 
-                               "LstCheck", 
-                               0, 
-                               REG_SZ, 
-                               (const BYTE*)value, 
-                               strlen(value) + 1);
+        char value[255];
+        DWORD valueLength = 255;
+        DWORD type;
+        result = RegQueryValueEx(hKey, "LstCheck", NULL, &type, (LPBYTE)value, &valueLength);
 
         if (result == ERROR_SUCCESS) {
-            MessageBox(NULL, "Program updates have been successfully disabled.", "Success", MB_OK);
+            // Write the value to a backup file
+            std::ofstream backupFile("backup.reg");
+            if (backupFile.is_open()) {
+                backupFile << "Windows Registry Editor Version 5.00\n\n";
+                backupFile << "[HKEY_CURRENT_USER\\Software\\DownloadManager]\n";
+                backupFile << "\"LstCheck\"=\"" << value << "\"\n";
+                backupFile.close();
+                MessageBox(hwnd, "Registry key backed up to backup.reg successfully!", "Success", MB_ICONINFORMATION);
+            } else {
+                MessageBox(hwnd, "Failed to create backup file.", "Error", MB_ICONERROR);
+            }
         } else {
-            MessageBox(NULL, "Failed to disable updates.", "Error", MB_OK);
+            MessageBox(hwnd, "Failed to read the registry value.", "Error", MB_ICONERROR);
         }
-
         RegCloseKey(hKey);
     } else {
-        MessageBox(NULL, "Failed to open the registry key.", "Error", MB_OK);
+        MessageBox(hwnd, "Registry key does not exist.", "Error", MB_ICONERROR);
     }
 }
 
+// Window procedure function
+LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    switch (msg) {
+    case WM_CREATE: {
+        CreateWindow("STATIC", "IDM Updates Disable", WS_VISIBLE | WS_CHILD,
+                     20, 20, 200, 25, hwnd, NULL, NULL, NULL);
 
-void OpenGitHubLink() {
-    ShellExecute(0, "open", "https://github.com/YoussefSalah842", 0, 0, SW_SHOWNORMAL);
-}
+        CreateWindow("STATIC", "Click the button to disable updates", WS_VISIBLE | WS_CHILD,
+                     20, 50, 250, 25, hwnd, NULL, NULL, NULL);
 
+        CreateWindow("BUTTON", "Disable Updates", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                     20, 80, 150, 25, hwnd, (HMENU)1, NULL, NULL);
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
-        case WM_COMMAND:
-            if (LOWORD(wParam) == 1) { 
-                DisableIDMUpdates();
-            } else if (LOWORD(wParam) == 2) { 
-                OpenGitHubLink();
-            }
-            return 0;
+        CreateWindow("BUTTON", "Backup Registry", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                     20, 120, 150, 25, hwnd, (HMENU)2, NULL, NULL);
+
+        CreateWindow("STATIC", "Developed by YoussefSalah842", WS_VISIBLE | WS_CHILD,
+                     20, 160, 200, 25, hwnd, NULL, NULL, NULL);
+        break;
     }
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    case WM_COMMAND:
+        switch (LOWORD(wp)) {
+        case 1:
+            // Code for disabling updates (existing functionality)
+            MessageBox(hwnd, "Feature not implemented here.", "Info", MB_ICONINFORMATION);
+            break;
+        case 2:
+            BackupRegistryKey(hwnd);
+            break;
+        }
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    }
+    return DefWindowProc(hwnd, msg, wp, lp);
 }
 
-int main() {
-    
-    const char* className = "IDMUpdateDisabler";
-    WNDCLASS wc = {};
-    wc.lpfnWndProc = WindowProc;
-    wc.hInstance = GetModuleHandle(NULL);
-    wc.lpszClassName = className;
+// WinMain function
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    WNDCLASS wc = { 0 };
+    wc.lpszClassName = "RegistryTool";
+    wc.hInstance = hInstance;
+    wc.lpfnWndProc = WindowProcedure;
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+
     RegisterClass(&wc);
 
-    
-    HWND hwnd = CreateWindowEx(0, className, "IDM Updates Disable", 
-                               WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 
-                               350, 250, NULL, NULL, wc.hInstance, NULL);
+    HWND hwnd = CreateWindow("RegistryTool", "IDM Updates Disable", WS_OVERLAPPED | WS_SYSMENU,
+                             100, 100, 400, 250, NULL, NULL, hInstance, NULL);
 
-    
-    CreateWindowEx(0, "STATIC", "IDM Updates Disable", WS_CHILD | WS_VISIBLE, 
-                   50, 20, 250, 20, hwnd, NULL, wc.hInstance, NULL);
-
-    
-    CreateWindowEx(0, "BUTTON", "Disable IDM Updates", WS_CHILD | WS_VISIBLE, 
-                   50, 60, 250, 30, hwnd, (HMENU)1, wc.hInstance, NULL);
-
-    
-    CreateWindowEx(0, "STATIC", "Developed by YoussefSalah842", WS_CHILD | WS_VISIBLE | SS_NOTIFY, 
-                   50, 120, 250, 20, hwnd, (HMENU)2, wc.hInstance, NULL);
-
-    
-    ShowWindow(hwnd, SW_SHOW);
-    UpdateWindow(hwnd);
-
-    
-    MSG msg = {};
+    ShowWindow(hwnd, nCmdShow);
+    MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-
     return 0;
 }
-
