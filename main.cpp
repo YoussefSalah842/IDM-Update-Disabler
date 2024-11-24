@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <commctrl.h>
+#include "RegistryUtils.cpp"
 #include <shobjidl.h>  // For file picker dialog
 #pragma comment(lib, "comctl32.lib")
 
