@@ -3,35 +3,56 @@
 #include <string>
 #include <iostream>
 #include <commctrl.h>
-#include "RegistryUtils.cpp"
-#include <shobjidl.h>  // For file picker dialog
+#include <shobjidl.h>
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "comdlg32.lib")
 
-// Function to log errors to a file
+std::string backupValue;  // Variable to store the backup registry value
+
 void LogError(const std::string& errorMsg) {
     std::ofstream logFile("error_log.txt", std::ios::app);
     if (logFile.is_open()) {
-        logFile << "Error: " << errorMsg << std::endl;
+        logFile << "Error: " << errorMsg << " | Error Code: " << GetLastError() << std::endl;
         logFile.close();
     }
 }
 
-// Function to back up the registry key
-void BackupRegistryKey(HWND hwnd) {
+void DisableUpdates(HWND hwnd, HWND statusLabel) {
+    HKEY hKey;
+    const char* subkey = "Software\\DownloadManager";
+    LONG result = RegOpenKeyEx(HKEY_CURRENT_USER, subkey, 0, KEY_WRITE, &hKey);
+    if (result == ERROR_SUCCESS) {
+        DWORD dwValue = 0;
+        result = RegSetValueEx(hKey, "DisableUpdates", 0, REG_DWORD, (const BYTE*)&dwValue, sizeof(dwValue));
+
+        if (result == ERROR_SUCCESS) {
+            SetWindowText(statusLabel, "Status: Updates Disabled");
+            SetTextColor(GetDC(hwnd), RGB(0, 255, 0));  // Change status color to green
+            InvalidateRect(hwnd, NULL, TRUE);
+        } else {
+            MessageBox(hwnd, "Failed to disable updates.", "Error", MB_ICONERROR);
+            LogError("Failed to disable updates in registry.");
+        }
+        RegCloseKey(hKey);
+    } else {
+        MessageBox(hwnd, "Failed to open registry key for writing.", "Error", MB_ICONERROR);
+        LogError("Failed to open registry key Software\\DownloadManager for writing.");
+    }
+}
+
+void CopyRegistryFile(HWND hwnd) {
     HKEY hKey;
     const char* subkey = "Software\\DownloadManager";
     LONG result = RegOpenKeyEx(HKEY_CURRENT_USER, subkey, 0, KEY_READ, &hKey);
-
     if (result == ERROR_SUCCESS) {
         char value[255];
         DWORD valueLength = 255;
         DWORD type;
-        result = RegQueryValueEx(hKey, "LstCheck", NULL, &type, (LPBYTE)value, &valueLength);
+        result = RegQueryValueEx(hKey, "DisableUpdates", NULL, &type, (LPBYTE)value, &valueLength);
 
         if (result == ERROR_SUCCESS) {
-            // Open file dialog to save the backup file
-            OPENFILENAME ofn;       // common dialog box structure
-            char szFile[260];       // buffer for file name
+            OPENFILENAME ofn;
+            char szFile[260];
 
             ZeroMemory(&ofn, sizeof(ofn));
             ofn.lStructSize = sizeof(ofn);
@@ -46,13 +67,12 @@ void BackupRegistryKey(HWND hwnd) {
             ofn.lpstrInitialDir = NULL;
             ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_OVERWRITEPROMPT;
 
-            if (GetSaveFileName(&ofn) == TRUE) {
-                // Write the registry value to the selected file
+            if (GetSaveFileName(&ofn)) {
                 std::ofstream backupFile(ofn.lpstrFile);
                 if (backupFile.is_open()) {
                     backupFile << "Windows Registry Editor Version 5.00\n\n";
                     backupFile << "[HKEY_CURRENT_USER\\Software\\DownloadManager]\n";
-                    backupFile << "\"LstCheck\"=\"" << value << "\"\n";
+                    backupFile << "\"DisableUpdates\"=\"" << value << "\"\n";
                     backupFile.close();
                     MessageBox(hwnd, "Registry key backed up successfully!", "Success", MB_ICONINFORMATION);
                 } else {
@@ -62,7 +82,7 @@ void BackupRegistryKey(HWND hwnd) {
             }
         } else {
             MessageBox(hwnd, "Failed to read the registry value.", "Error", MB_ICONERROR);
-            LogError("Failed to read registry value LstCheck.");
+            LogError("Failed to read registry value DisableUpdates.");
         }
         RegCloseKey(hKey);
     } else {
@@ -71,56 +91,71 @@ void BackupRegistryKey(HWND hwnd) {
     }
 }
 
-// Function to disable automatic updates in the registry
-void DisableUpdates(HWND hwnd) {
-    HKEY hKey;
-    const char* subkey = "Software\\DownloadManager";
-    LONG result = RegOpenKeyEx(HKEY_CURRENT_USER, subkey, 0, KEY_WRITE, &hKey);
+void RestoreUpdates(HWND hwnd, HWND statusLabel) {
+    OPENFILENAME ofn;
+    char szFile[260];
 
-    if (result == ERROR_SUCCESS) {
-        DWORD dwValue = 0;  // Assume 0 means updates are disabled
-        result = RegSetValueEx(hKey, "DisableUpdates", 0, REG_DWORD, (const BYTE*)&dwValue, sizeof(dwValue));
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd;
+    ofn.lpstrFile = szFile;
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = sizeof(szFile);
+    ofn.lpstrFilter = "Registry Files\0*.reg\0All Files\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.lpstrInitialDir = NULL;
+    ofn.Flags = OFN_FILEMUSTEXIST;
 
-        if (result == ERROR_SUCCESS) {
-            MessageBox(hwnd, "Updates have been disabled.", "Success", MB_ICONINFORMATION);
-        } else {
-            MessageBox(hwnd, "Failed to disable updates.", "Error", MB_ICONERROR);
-            LogError("Failed to disable updates in registry.");
-        }
-        RegCloseKey(hKey);
+    if (GetOpenFileName(&ofn)) {
+        std::string command = "regedit /s " + std::string(ofn.lpstrFile);
+        system(command.c_str());
+        SetWindowText(statusLabel, "Status: Updates Restored");
+        SetTextColor(GetDC(hwnd), RGB(0, 0, 255));  // Set status color to blue (indicating updates are running)
+        InvalidateRect(hwnd, NULL, TRUE);
+        MessageBox(hwnd, "Registry restored successfully!", "Success", MB_ICONINFORMATION);
     } else {
-        MessageBox(hwnd, "Failed to open registry key for writing.", "Error", MB_ICONERROR);
-        LogError("Failed to open registry key Software\\DownloadManager for writing.");
+        MessageBox(hwnd, "Failed to select a registry file.", "Error", MB_ICONERROR);
+        LogError("Failed to select a registry file for restoration.");
     }
 }
 
-// Window procedure function
 LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    static HWND statusLabel;
+
     switch (msg) {
     case WM_CREATE: {
         CreateWindow("STATIC", "IDM Updates Disable", WS_VISIBLE | WS_CHILD,
-                     20, 20, 200, 25, hwnd, NULL, NULL, NULL);
+                     100, 20, 200, 25, hwnd, NULL, NULL, NULL);
 
         CreateWindow("STATIC", "Click a button to perform an action", WS_VISIBLE | WS_CHILD,
-                     20, 50, 250, 25, hwnd, NULL, NULL, NULL);
+                     100, 50, 250, 25, hwnd, NULL, NULL, NULL);
+
+        CreateWindow("BUTTON", "Copy Registry File", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                     100, 80, 150, 25, hwnd, (HMENU)1, NULL, NULL);
 
         CreateWindow("BUTTON", "Disable Updates", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                     20, 80, 150, 25, hwnd, (HMENU)1, NULL, NULL);
+                     100, 120, 150, 25, hwnd, (HMENU)2, NULL, NULL);
 
-        CreateWindow("BUTTON", "Backup Registry", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                     20, 120, 150, 25, hwnd, (HMENU)2, NULL, NULL);
+        CreateWindow("BUTTON", "Restore Updates", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                     100, 160, 150, 25, hwnd, (HMENU)3, NULL, NULL);
 
-        CreateWindow("STATIC", "Developed by YoussefSalah842", WS_VISIBLE | WS_CHILD,
-                     20, 160, 200, 25, hwnd, NULL, NULL, NULL);
+        statusLabel = CreateWindow("STATIC", "Status: Updates Running", WS_VISIBLE | WS_CHILD | SS_CENTER,
+                                   100, 200, 200, 25, hwnd, NULL, NULL, NULL);
+        SetTextColor(GetDC(hwnd), RGB(255, 0, 0));  // Set initial color to red
         break;
     }
     case WM_COMMAND:
         switch (LOWORD(wp)) {
         case 1:
-            DisableUpdates(hwnd); // Call function to disable updates
+            CopyRegistryFile(hwnd);  // Copy registry file
             break;
         case 2:
-            BackupRegistryKey(hwnd); // Call function to back up the registry
+            DisableUpdates(hwnd, statusLabel);  // Disable updates
+            break;
+        case 3:
+            RestoreUpdates(hwnd, statusLabel);  // Restore updates
             break;
         }
         break;
@@ -131,7 +166,6 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProc(hwnd, msg, wp, lp);
 }
 
-// WinMain function
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     WNDCLASS wc = { 0 };
     wc.lpszClassName = "RegistryTool";
@@ -143,7 +177,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindow("RegistryTool", "IDM Updates Disable", WS_OVERLAPPED | WS_SYSMENU,
-                             100, 100, 400, 250, NULL, NULL, hInstance, NULL);
+                             100, 100, 400, 300, NULL, NULL, hInstance, NULL);
 
     ShowWindow(hwnd, nCmdShow);
     MSG msg;
