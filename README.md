@@ -1,50 +1,34 @@
 # IDM Update Disabler
 
-IDM Updates Disabler is a lightweight tool designed to disable automatic updates for Internet Download Manager
-
-This project allows you to interact with the Windows registry to manage the update settings for DownloadManager. It provides functionality to back up disable and restore registry values related to the software.
-
-![Screenshot 2024-12-02 183141](https://github.com/user-attachments/assets/323db905-8181-4294-ae68-e990013d864e)
-
-user-friendly tool crafted to help you manage your Internet Download Manager (IDM) settings with ease. With just a click of a button, this little utility disables IDM’s automatic update feature, giving you more control over your software. It’s a neat, no-fuss solution for users who prefer to avoid unwanted updates. Developed with care and simplicity in mind.
+## Description
+This project provides a simple tool to manage IDM updates by interacting with the Windows registry. The tool allows users to:
+1. **Disable updates** by modifying the registry.
+2. **Backup the registry** to a `.reg` file for future restoration.
+3. **Restore registry settings** from a backup file.
 
 ## Features
+- **Disable Updates**: Modifies the registry key to disable IDM updates.
+- **Backup Registry**: Saves the current registry settings for IDM updates to a `.reg` file.
+- **Restore Updates**: Allows users to restore IDM updates from a previously saved registry backup.
 
-1. **Copy Registry File**:  
-   - Back up the current registry value for `DisableUpdates` in the registry key `Software\DownloadManager` to a `.reg` file.
-   
-2. **Disable Updates**:  
-   - Disable updates by modifying the `DisableUpdates` registry key. After disabling updates, the status changes to "Updates Disabled" in green.
-   
-3. **Restore Updates**:  
-   - Restore the registry value for `DisableUpdates` from a previously saved `.reg` file.
-
-4. **Dynamic Status Label**:  
-   - The status label shows the current state of updates.
-     - "Updates Running" (Red) when updates are active.
-     - "Updates Disabled" (Green) after the disable action is performed.
+## Improvements
+- **Error Logging**: All errors are logged to an `error_log.txt` file for easier debugging.
+- **UI Enhancements**: Added a simple GUI with buttons to perform actions and display status updates.
 
 ## How to Use
+1. **Backup the registry**: Click the "Backup Registry" button to save the current IDM registry settings.
+2. **Disable updates**: Click the "Disable Updates" button to prevent IDM from updating.
+3. **Restore updates**: Click the "Restore Updates" button to restore the registry to its original state.
 
-1. **Copy Registry File**:  
-   - Click the **Copy Registry File** button to back up the current registry value to a `.reg` file.
-   
-2. **Disable Updates**:  
-   - Click the **Disable Updates** button to modify the registry and disable updates. The status will change to "Updates Disabled" in green.
+## Requirements
+- Windows 7 or Hihger
+- Compiler that supports C++ and Windows API (e.g., MinGW)
 
-3. **Restore Updates**:  
-   - Click the **Restore Updates** button to restore the original registry value from a previously backed-up `.reg` file.
+## Installation
+1. Download or clone this repository.
+2. Open the project in your development environment (e.g., Dev-C++).
+3. Build the project using the provided Makefile or directly in your IDE.
+4. Run the executable.
 
 ## Known Issues
-
-- The program requires administrative privileges to modify the registry.
-- The "Restore Updates" function requires a valid backup `.reg` file to work.
-
-
-![Screenshot 2024-11-20 201446](https://github.com/user-attachments/assets/bea3e2f6-8192-4dcb-99ae-7ea5f09ef6a8)
-
-You will notice that the program will no longer give you an update message. To see the effect, go to
-
-HKEY_CURRENT_USER > Software > DownloadManager.
-
-In the registry, you will find the change that was made to the LstCheck file.
+- The tool currently only works on the Windows OS and modifies registry values which should be used carefully.
