@@ -21,7 +21,7 @@ This project provides a simple tool to manage IDM updates by interacting with th
 3. **Restore updates**: Click the "Restore Updates" button to restore the registry to its original state.
 
 ## Requirements
-- Windows 7 or Hihger
+- Windows 7 or Higher
 - Compiler that supports C++ and Windows API (e.g., MinGW)
 
 ## Installation
